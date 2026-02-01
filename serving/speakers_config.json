@@ -1,0 +1,52 @@
+{
+  "_comment": "LOVO speaker configuration for Qwen3-TTS. Maps LOVO speaker names to Qwen model settings.",
+
+  "voice_clone": {
+    "model_type": "base",
+    "x_vector_only_mode": true,
+    "description": "Basic voice cloning using speaker embedding only"
+  },
+
+  "voice_clone_v2": {
+    "model_type": "base",
+    "x_vector_only_mode": false,
+    "description": "Advanced voice cloning with ICL mode (requires ref_text)"
+  },
+
+  "voice_clone_hybrid": {
+    "model_type": "hybrid",
+    "description": "Voice cloning + instruction control (clone voice AND control style)"
+  },
+
+  "_template_custom_voice": {
+    "model_type": "custom_voice",
+    "speaker_id": "speaker_name_in_qwen",
+    "language": "Auto",
+    "instruct": null,
+    "loudness_lufs_level": null,
+    "bass_boost": null,
+    "treble_boost": null,
+    "pitch_shift": null,
+    "fade_in": null,
+    "fade_out": null
+  },
+
+  "_template_voice_design": {
+    "model_type": "voice_design",
+    "instruct": "A calm, professional female voice",
+    "language": "Auto",
+    "loudness_lufs_level": null,
+    "bass_boost": null,
+    "treble_boost": null
+  },
+
+  "_template_hybrid": {
+    "model_type": "hybrid",
+    "instruct": "Speak with a natural, conversational tone",
+    "language": "Auto",
+    "loudness_lufs_level": null,
+    "bass_boost": null,
+    "treble_boost": null,
+    "_note": "Requires ref_audio at synthesis time. ref_text optional but improves quality."
+  }
+}
