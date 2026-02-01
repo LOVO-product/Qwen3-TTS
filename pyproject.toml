@@ -31,6 +31,12 @@ dependencies = [
   "einops",
 ]
 
+[project.optional-dependencies]
+serving = [
+  "pyloudnorm",
+  "descript-audiotools",
+]
+
 [project.urls]
 Homepage = "https://github.com/Qwen/Qwen3-TTS"
 Repository = "https://github.com/Qwen/Qwen3-TTS"
