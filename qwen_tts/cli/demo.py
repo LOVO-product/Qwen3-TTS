@@ -27,7 +27,7 @@ import gradio as gr
 import numpy as np
 import torch
 
-from .. import Qwen3TTSModel, VoiceClonePromptItem
+from .. import Qwen3TTSModel, VoiceClonePromptItem, generate_hybrid_voice
 
 
 def _title_case_display(s: str) -> str:
@@ -284,57 +284,143 @@ def build_demo(tts: Qwen3TTSModel, ckpt: str, gen_kwargs_default: Dict[str, Any]
         )
 
         if model_kind == "custom_voice":
-            with gr.Row():
-                with gr.Column(scale=2):
-                    text_in = gr.Textbox(
-                        label="Text (待合成文本)",
-                        lines=4,
-                        placeholder="Enter text to synthesize (输入要合成的文本).",
+            with gr.Tabs():
+                with gr.Tab("Preset Speakers (预设音色)"):
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            text_in = gr.Textbox(
+                                label="Text (待合成文本)",
+                                lines=4,
+                                placeholder="Enter text to synthesize (输入要合成的文本).",
+                            )
+                            with gr.Row():
+                                lang_in = gr.Dropdown(
+                                    label="Language (语种)",
+                                    choices=lang_choices_disp,
+                                    value="Auto",
+                                    interactive=True,
+                                )
+                                spk_in = gr.Dropdown(
+                                    label="Speaker (说话人)",
+                                    choices=spk_choices_disp,
+                                    value="Vivian",
+                                    interactive=True,
+                                )
+                            instruct_in = gr.Textbox(
+                                label="Instruction (Optional) (控制指令，可不输入)",
+                                lines=2,
+                                placeholder="e.g. Say it in a very angry tone (例如：用特别伤心的语气说).",
+                            )
+                            btn = gr.Button("Generate (生成)", variant="primary")
+                        with gr.Column(scale=3):
+                            audio_out = gr.Audio(label="Output Audio (合成结果)", type="numpy")
+                            err = gr.Textbox(label="Status (状态)", lines=2)
+
+                    def run_instruct(text: str, lang_disp: str, spk_disp: str, instruct: str):
+                        try:
+                            if not text or not text.strip():
+                                return None, "Text is required (必须填写文本)."
+                            if not spk_disp:
+                                return None, "Speaker is required (必须选择说话人)."
+                            language = lang_map.get(lang_disp, "Auto")
+                            speaker = spk_map.get(spk_disp, spk_disp)
+                            kwargs = _gen_common_kwargs()
+                            wavs, sr = tts.generate_custom_voice(
+                                text=text.strip(),
+                                language=language,
+                                speaker=speaker,
+                                instruct=(instruct or "").strip() or None,
+                                **kwargs,
+                            )
+                            return _wav_to_gradio_audio(wavs[0], sr), "Finished. (生成完成)"
+                        except Exception as e:
+                            return None, f"{type(e).__name__}: {e}"
+
+                    btn.click(run_instruct, inputs=[text_in, lang_in, spk_in, instruct_in], outputs=[audio_out, err])
+
+                with gr.Tab("Hybrid Clone + Instruct (克隆+指令控制)"):
+                    gr.Markdown(
+                        """
+### Clone any voice AND control its style/emotion
+Upload a reference audio (~3 seconds) to clone a voice, then use instructions to control how it speaks.
+(上传参考音频来克隆音色，同时使用指令控制说话风格和情感)
+
+**Tip:** For better cloning quality, provide the transcript of the reference audio (optional).
+(提示：提供参考音频的文字内容可以获得更好的克隆效果，此项为可选)
+
+**Note:** When both reference text and instruction are provided, there's a trade-off:
+- **Prioritize instruction (checked):** Style follows your instruction, but cloning may be less accurate
+- **Prioritize reference style (unchecked):** Higher quality cloning that copies reference style, but instruction may be ignored
+
+(注意：同时提供参考文本和指令时存在权衡：勾选"优先使用指令"时按指令控制风格，取消勾选时更准确地复制参考音频的风格)
+"""
                     )
                     with gr.Row():
-                        lang_in = gr.Dropdown(
-                            label="Language (语种)",
-                            choices=lang_choices_disp,
-                            value="Auto",
-                            interactive=True,
-                        )
-                        spk_in = gr.Dropdown(
-                            label="Speaker (说话人)",
-                            choices=spk_choices_disp,
-                            value="Vivian",
-                            interactive=True,
-                        )
-                    instruct_in = gr.Textbox(
-                        label="Instruction (Optional) (控制指令，可不输入)",
-                        lines=2,
-                        placeholder="e.g. Say it in a very angry tone (例如：用特别伤心的语气说).",
-                    )
-                    btn = gr.Button("Generate (生成)", variant="primary")
-                with gr.Column(scale=3):
-                    audio_out = gr.Audio(label="Output Audio (合成结果)", type="numpy")
-                    err = gr.Textbox(label="Status (状态)", lines=2)
+                        with gr.Column(scale=2):
+                            hybrid_ref_audio = gr.Audio(
+                                label="Reference Audio (参考音频 ~3秒)",
+                            )
+                            hybrid_ref_text = gr.Textbox(
+                                label="Reference Text (Optional - for better quality) (参考音频文本，可选，填写可提升克隆质量)",
+                                lines=2,
+                                placeholder="Transcript of the reference audio (参考音频中说的话)",
+                            )
+                            hybrid_text_in = gr.Textbox(
+                                label="Text to Synthesize (待合成文本)",
+                                lines=4,
+                                placeholder="Enter text to synthesize (输入要合成的文本).",
+                            )
+                            hybrid_lang_in = gr.Dropdown(
+                                label="Language (语种)",
+                                choices=lang_choices_disp,
+                                value="Auto",
+                                interactive=True,
+                            )
+                            hybrid_instruct_in = gr.Textbox(
+                                label="Style Instruction (风格指令)",
+                                lines=2,
+                                placeholder="e.g. Speak with excitement and happiness! (例如：用兴奋开心的语气说)",
+                            )
+                            hybrid_prioritize_instruct = gr.Checkbox(
+                                label="Prioritize instruction over reference style (优先使用指令而非参考音频风格)",
+                                value=True,
+                                info="When checked, instruction controls style. Uncheck to copy reference audio's style more closely (instruction may be ignored).",
+                            )
+                            hybrid_btn = gr.Button("Generate (生成)", variant="primary")
+                        with gr.Column(scale=3):
+                            hybrid_audio_out = gr.Audio(label="Output Audio (合成结果)", type="numpy")
+                            hybrid_err = gr.Textbox(label="Status (状态)", lines=2)
 
-            def run_instruct(text: str, lang_disp: str, spk_disp: str, instruct: str):
-                try:
-                    if not text or not text.strip():
-                        return None, "Text is required (必须填写文本)."
-                    if not spk_disp:
-                        return None, "Speaker is required (必须选择说话人)."
-                    language = lang_map.get(lang_disp, "Auto")
-                    speaker = spk_map.get(spk_disp, spk_disp)
-                    kwargs = _gen_common_kwargs()
-                    wavs, sr = tts.generate_custom_voice(
-                        text=text.strip(),
-                        language=language,
-                        speaker=speaker,
-                        instruct=(instruct or "").strip() or None,
-                        **kwargs,
-                    )
-                    return _wav_to_gradio_audio(wavs[0], sr), "Finished. (生成完成)"
-                except Exception as e:
-                    return None, f"{type(e).__name__}: {e}"
+                    def run_hybrid(ref_aud, ref_txt: str, text: str, lang_disp: str, instruct: str, prioritize_instruct: bool):
+                        try:
+                            if not text or not text.strip():
+                                return None, "Text is required (必须填写文本)."
+                            at = _audio_to_tuple(ref_aud)
+                            if at is None:
+                                return None, "Reference audio is required (必须上传参考音频)."
+                            language = lang_map.get(lang_disp, "Auto")
+                            kwargs = _gen_common_kwargs()
+                            wavs, sr = generate_hybrid_voice(
+                                model=tts,
+                                text=text.strip(),
+                                ref_audio=at,
+                                ref_text=(ref_txt.strip() if ref_txt and ref_txt.strip() else None),
+                                instruct=(instruct or "").strip() or None,
+                                language=language,
+                                prioritize_instruction=prioritize_instruct,
+                                **kwargs,
+                            )
+                            return _wav_to_gradio_audio(wavs[0], sr), "Finished. (生成完成)"
+                        except Exception as e:
+                            import traceback
+                            traceback.print_exc()
+                            return None, f"{type(e).__name__}: {e}"
 
-            btn.click(run_instruct, inputs=[text_in, lang_in, spk_in, instruct_in], outputs=[audio_out, err])
+                    hybrid_btn.click(
+                        run_hybrid,
+                        inputs=[hybrid_ref_audio, hybrid_ref_text, hybrid_text_in, hybrid_lang_in, hybrid_instruct_in, hybrid_prioritize_instruct],
+                        outputs=[hybrid_audio_out, hybrid_err],
+                    )
 
         elif model_kind == "voice_design":
             with gr.Row():

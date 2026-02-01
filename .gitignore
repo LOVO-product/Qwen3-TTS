@@ -22,3 +22,34 @@ wheels/
 .vscode/
 venv/
 env/
+
+# Claude Code
+CLAUDE.md
+.claude/
+
+# Model files
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.onnx
+
+# Audio files (generated outputs)
+*.wav
+*.mp3
+*.flac
+
+# Training/experiment outputs
+wandb/
+logs/
+checkpoints/
+outputs/
+runs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db

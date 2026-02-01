@@ -20,5 +20,6 @@ qwen_tts: Qwen-TTS package.
 
 from .inference.qwen3_tts_model import Qwen3TTSModel, VoiceClonePromptItem
 from .inference.qwen3_tts_tokenizer import Qwen3TTSTokenizer
+from .inference.hybrid_voice import generate_hybrid_voice, create_hybrid_voice_prompt, HybridVoicePrompt
 
-__all__ = ["__version__"]
+__all__ = ["__version__", "Qwen3TTSModel", "VoiceClonePromptItem", "Qwen3TTSTokenizer", "generate_hybrid_voice", "create_hybrid_voice_prompt", "HybridVoicePrompt"]
